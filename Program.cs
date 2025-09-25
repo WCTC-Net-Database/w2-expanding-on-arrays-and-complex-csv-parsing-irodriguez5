@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Security.Cryptography;
 
 class Program
 {
@@ -26,10 +27,12 @@ class Program
                     DisplayAllCharacters(lines);
                     break;
                 case "2":
-                    AddCharacter(ref lines);
+                    AddCharacter(ref lines, filePath);
+                    lines = File.ReadAllLines(filePath);  //had help from copilot. unable to figure out why new charcters did not sisplay without this line
                     break;
                 case "3":
-                    LevelUpCharacter(lines);
+                    LevelUpCharacter(lines, filePath); 
+                    lines = File.ReadAllLines(filePath);
                     break;
                 case "4":
                     return;
@@ -48,69 +51,146 @@ class Program
             string line = lines[i];
 
             string name;
-            int commaIndex;
+            string characterClass;
+            int level;
+            int hitPoints;
+            string[] equipment;
+
+            int startIdx;
 
             // Check if the name is quoted
             if (line.StartsWith("\""))
             {
-                // TODO: Find the closing quote and the comma right after it
-                // TODO: Remove quotes from the name if present and parse the name
-                // name = ...
+                int endQuoteIdx = line.IndexOf('"', 1);
+                name = line.Substring(1, endQuoteIdx - 1);
+                // The next comma after the closing quote
+                startIdx = endQuoteIdx + 2; // skip quote and comma
             }
             else
             {
-                // TODO: Name is not quoted, so store the name up to the first comma
-                // name =
+                int commaIdx = line.IndexOf(',');
+                name = line.Substring(0, commaIdx);
+                startIdx = commaIdx + 1;
             }
 
-            // TODO: Parse characterClass, level, hitPoints, and equipment
-            // string characterClass = ...
-            // int level = ...
-            // int hitPoints = ...
+            // Now parse the rest of the fields
+            string rest = line.Substring(startIdx);
+            string[] fields = rest.Split(',');
 
-            // TODO: Parse equipment noting that it contains multiple items separated by '|'
-            // string[] equipment = ...
+            characterClass = fields[0];
+            level = int.Parse(fields[1]);
+            hitPoints = int.Parse(fields[2]);
+            equipment = fields[3].Split('|');
 
             // Display character information
-            // Console.WriteLine($"Name: {name}, Class: {characterClass}, Level: {level}, HP: {hitPoints}, Equipment: {string.Join(", ", equipment)}");
+            Console.WriteLine($"Name: {name}, Class: {characterClass}, Level: {level}, HP: {hitPoints}, Equipment: {string.Join(", ", equipment)}");
         }
     }
 
-    static void AddCharacter(ref string[] lines)
+    static void AddCharacter(ref string[] lines, string filePath)
     {
         // TODO: Implement logic to add a new character
-        // Prompt for character details (name, class, level, hit points, equipment)
-        // DO NOT just ask the user to enter a new line of CSV data or enter the pipe-separated equipment string
-        // Append the new character to the lines array
-    }
 
-    static void LevelUpCharacter(string[] lines)
+        // Prompt for character details (name, class, level, hit points, equipment)
+        Console.WriteLine("Enter character name: ");
+        string name = Console.ReadLine();
+        Console.WriteLine("Enter class:");
+        string characterClass = Console.ReadLine();
+        Console.WriteLine("Enter level:");
+        int level = int.Parse(Console.ReadLine());
+        Console.WriteLine("Enter hit points:");
+        int hitPoints = int.Parse(Console.ReadLine());
+        Console.WriteLine("Enter equipment items separated by commas:");
+        string[] equipmentArray = Console.ReadLine().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        string equipmentInput = string.Join("|", equipmentArray);
+
+        // DO NOT just ask the user to enter a new line of CSV data or enter the pipe-separated equipment string
+        string csvName = name.Contains(",") ? $"\"{name}\"" : name; // Handle names with commas
+       
+        // Append the new character to the lines array
+        string newLine = $"{csvName},{characterClass},{level},{hitPoints},{equipmentInput}";
+        try
+        {
+            // Print the full file path for debugging
+            Console.WriteLine($"Writing to: {Path.GetFullPath(filePath)}");
+
+            // Append the new character to the file
+            using (StreamWriter writer = new StreamWriter(filePath, true))
+            {
+                writer.WriteLine(newLine);
+            }
+
+            // Refresh lines array
+            lines = File.ReadAllLines(filePath);
+
+            Console.WriteLine("Character added successfully!");
+            // Optionally, display all characters immediately:
+            DisplayAllCharacters(lines);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error writing to file: {ex.Message}");
+        }
+
+    }
+    static void LevelUpCharacter(string[] lines, string filePath)
     {
         Console.Write("Enter the name of the character to level up: ");
         string nameToLevelUp = Console.ReadLine();
 
-        // Loop through characters to find the one to level up
+        bool found = false;
+
         for (int i = 1; i < lines.Length; i++)
         {
             string line = lines[i];
+            string name;
+            int startIdx;
 
-            // TODO: Check if the name matches the one to level up
-            // Do not worry about case sensitivity at this point
-            if (line.Contains(nameToLevelUp))
+            if (line.StartsWith("\""))
             {
+                int endQuoteIdx = line.IndexOf('"', 1);
+                name = line.Substring(1, endQuoteIdx - 1);
+                startIdx = endQuoteIdx + 2;
+            }
+            else
+            {
+                int commaIdx = line.IndexOf(',');
+                name = line.Substring(0, commaIdx);
+                startIdx = commaIdx + 1;
+            }
 
-                // TODO: Split the rest of the fields locating the level field
-                // string[] fields = ...
-                // int level = ...
+            if (name.Equals(nameToLevelUp, StringComparison.OrdinalIgnoreCase))
+            {
+                string rest = line.Substring(startIdx);
+                string[] fields = rest.Split(',');
 
-                // TODO: Level up the character
-                // level++;
-                // Console.WriteLine($"Character {name} leveled up to level {level}!");
+                string characterClass = fields[0];
+                int level = int.Parse(fields[1]);
+                int hitPoints = int.Parse(fields[2]);
+                string equipment = fields[3];
 
-                // TODO: Update the line with the new level
-                // lines[i] = ...
+                level++;
+                Console.WriteLine($"Character {name} leveled up to level {level}!");
+
+                string csvName = line.StartsWith("\"") ? $"\"{name}\"" : name;
+                string newLine = $"{csvName},{characterClass},{level},{hitPoints},{equipment}";
+                lines[i] = newLine;
+                found = true;
                 break;
             }
         }
+
+        if (found)
+        {
+            File.WriteAllLines(filePath, lines);
+        }
+        else
+        {
+            Console.WriteLine("Character not found.");
+        }
     }
+
+
+
+
 }
